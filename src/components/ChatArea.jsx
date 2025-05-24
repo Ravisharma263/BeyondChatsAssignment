@@ -22,7 +22,8 @@ const ChatArea = ({ contact, isMobile, onMenuToggle, onBack }) => {
   const [showToolbar, setShowToolbar] = useState(false)
   const [showAIDropdown, setShowAIDropdown] = useState(false)
   const [toolbarPosition, setToolbarPosition] = useState({ x: 0, y: 0 })
-  const [cursorPosition, setCursorPosition] = useState(0)
+  const [selectedText, setSelectedText] = useState("")
+  const [selectionRange, setSelectionRange] = useState({ start: 0, end: 0 })
   const textAreaRef = useRef(null)
   const toolbarRef = useRef(null)
   const aiDropdownRef = useRef(null)
@@ -46,45 +47,69 @@ const ChatArea = ({ contact, isMobile, onMenuToggle, onBack }) => {
     }
   }, [messageInput])
 
-  // Handle click in textarea
+  // Handle click in textarea with text selection
   useEffect(() => {
-    const handleTextAreaClick = (e) => {
+    const handleTextAreaInteraction = (e) => {
       const textArea = textAreaRef.current
       if (!textArea) return
 
-      console.log("Textarea clicked") // Debug log
+      // Get selection
+      const start = textArea.selectionStart
+      const end = textArea.selectionEnd
+      const selected = messageInput.substring(start, end)
+
+      setSelectedText(selected)
+      setSelectionRange({ start, end })
 
       // Calculate position for toolbar
       const textAreaRect = textArea.getBoundingClientRect()
       const x = textAreaRect.left + textAreaRect.width / 2
       const y = textAreaRect.top - 60
 
-      console.log("Toolbar position:", { x, y }) // Debug log
-
       setToolbarPosition({ x, y })
       setShowToolbar(true)
+
+      // Auto-select word if clicked without selection
+      if (selected.length === 0 && e.type === "click") {
+        const text = messageInput
+        const clickPos = start
+
+        // Find word boundaries
+        let wordStart = clickPos
+        let wordEnd = clickPos
+
+        // Find start of word
+        while (wordStart > 0 && /\w/.test(text[wordStart - 1])) {
+          wordStart--
+        }
+
+        // Find end of word
+        while (wordEnd < text.length && /\w/.test(text[wordEnd])) {
+          wordEnd++
+        }
+
+        if (wordStart < wordEnd) {
+          textArea.setSelectionRange(wordStart, wordEnd)
+          setSelectedText(text.substring(wordStart, wordEnd))
+          setSelectionRange({ start: wordStart, end: wordEnd })
+        }
+      }
     }
 
     const textArea = textAreaRef.current
     if (textArea) {
-      textArea.addEventListener("click", handleTextAreaClick)
-      textArea.addEventListener("focus", handleTextAreaClick)
+      textArea.addEventListener("click", handleTextAreaInteraction)
+      textArea.addEventListener("mouseup", handleTextAreaInteraction)
+      textArea.addEventListener("focus", handleTextAreaInteraction)
     }
 
-    return () => {
-      if (textArea) {
-        textArea.removeEventListener("click", handleTextAreaClick)
-        textArea.removeEventListener("focus", handleTextAreaClick)
-      }
-    }
-  }, []) // Remove messageInput dependency
-
-  // Separate useEffect for click outside
-  useEffect(() => {
+    // Hide menus when clicking outside
     const handleClickOutside = (event) => {
       if (
         toolbarRef.current &&
         !toolbarRef.current.contains(event.target) &&
+        aiDropdownRef.current &&
+        !aiDropdownRef.current.contains(event.target) &&
         textAreaRef.current &&
         !textAreaRef.current.contains(event.target)
       ) {
@@ -94,18 +119,24 @@ const ChatArea = ({ contact, isMobile, onMenuToggle, onBack }) => {
     }
 
     document.addEventListener("mousedown", handleClickOutside)
+
     return () => {
+      if (textArea) {
+        textArea.removeEventListener("click", handleTextAreaInteraction)
+        textArea.removeEventListener("mouseup", handleTextAreaInteraction)
+        textArea.removeEventListener("focus", handleTextAreaInteraction)
+      }
       document.removeEventListener("mousedown", handleClickOutside)
     }
-  }, [])
+  }, [messageInput])
 
   const applyAIAction = (action) => {
-    let transformedText = ""
+    if (!selectedText && !messageInput) return
 
-    // Get text around cursor or entire message
-    const textToTransform = messageInput || "Sample text"
+    const textToTransform = selectedText || messageInput
+    let transformedText = textToTransform
 
-    // Simulate AI transformations (in real app, you'd call an AI API)
+    // Simulate AI transformations
     switch (action) {
       case "rephrase":
         transformedText = `${textToTransform} (rephrased)`
@@ -127,11 +158,17 @@ const ChatArea = ({ contact, isMobile, onMenuToggle, onBack }) => {
         break
     }
 
-    setMessageInput(transformedText)
+    if (selectedText) {
+      const newMessage =
+        messageInput.substring(0, selectionRange.start) + transformedText + messageInput.substring(selectionRange.end)
+      setMessageInput(newMessage)
+    } else {
+      setMessageInput(transformedText)
+    }
+
     setShowToolbar(false)
     setShowAIDropdown(false)
 
-    // Refocus textarea
     setTimeout(() => {
       textAreaRef.current?.focus()
     }, 0)
@@ -141,8 +178,8 @@ const ChatArea = ({ contact, isMobile, onMenuToggle, onBack }) => {
     const textArea = textAreaRef.current
     if (!textArea) return
 
-    const start = textArea.selectionStart
-    const end = textArea.selectionEnd
+    const start = selectionRange.start
+    const end = selectionRange.end
     const selectedText = messageInput.substring(start, end)
 
     let formattedText = selectedText || "text"
@@ -258,62 +295,58 @@ const ChatArea = ({ contact, isMobile, onMenuToggle, onBack }) => {
             left: `${toolbarPosition.x}px`,
             top: `${toolbarPosition.y}px`,
             transform: "translateX(-50%)",
-            pointerEvents: "auto",
           }}
         >
           <div className="relative">
             <button
               ref={aiButtonRef}
               onClick={handleAIButtonClick}
-              className="px-2 py-1 rounded text-xs font-medium bg-blue-100 text-blue-700 hover:bg-blue-200 transition-colors"
+              className={`px-2 py-1 rounded text-xs font-medium hover:bg-blue-200 transition-colors ${
+                showAIDropdown ? "bg-blue-200 text-blue-700" : "bg-blue-100 text-blue-700"
+              }`}
             >
               AI
             </button>
 
-            {/* AI Dropdown Menu */}
+            {/* Compact AI Dropdown Menu - Positioned directly above AI button */}
             {showAIDropdown && (
               <div
                 ref={aiDropdownRef}
-                className="absolute z-[60] bg-white border border-gray-200 rounded-lg shadow-xl py-1 w-48"
-                style={{
-                  bottom: "100%",
-                  left: "0",
-                  marginBottom: "8px",
-                }}
+                className="absolute bottom-full left-0 mb-2 bg-white border border-gray-200 rounded-lg shadow-xl py-1 min-w-[180px] z-60"
               >
                 <button
                   onClick={() => applyAIAction("rephrase")}
-                  className="w-full text-left px-3 py-1.5 text-sm hover:bg-gray-100 font-medium"
+                  className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 font-medium text-gray-900"
                 >
                   Rephrase
                 </button>
                 <button
                   onClick={() => applyAIAction("tone")}
-                  className="w-full text-left px-3 py-1.5 text-sm hover:bg-gray-100 text-gray-600"
+                  className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 text-gray-600"
                 >
                   My tone of voice
                 </button>
                 <button
                   onClick={() => applyAIAction("friendly")}
-                  className="w-full text-left px-3 py-1.5 text-sm hover:bg-gray-100 text-gray-600"
+                  className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 text-gray-600"
                 >
                   More friendly
                 </button>
                 <button
                   onClick={() => applyAIAction("formal")}
-                  className="w-full text-left px-3 py-1.5 text-sm hover:bg-gray-100 text-gray-600"
+                  className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 text-gray-600"
                 >
                   More formal
                 </button>
                 <button
                   onClick={() => applyAIAction("grammar")}
-                  className="w-full text-left px-3 py-1.5 text-sm hover:bg-gray-100 text-gray-600"
+                  className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 text-gray-600"
                 >
                   Fix grammar & spelling
                 </button>
                 <button
                   onClick={() => applyAIAction("translate")}
-                  className="w-full text-left px-3 py-1.5 text-sm hover:bg-gray-100 text-gray-600"
+                  className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 text-gray-600"
                 >
                   Translate...
                 </button>
@@ -363,7 +396,7 @@ const ChatArea = ({ contact, isMobile, onMenuToggle, onBack }) => {
           <ChevronDown className="w-4 h-4 text-gray-500" />
         </div>
 
-        {/* Text Area */}
+        {/* Text Area with blue selection */}
         <textarea
           ref={textAreaRef}
           value={messageInput}
