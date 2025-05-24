@@ -34,7 +34,6 @@ A responsive AI Powered Customer Service Chat Panel Interface inspired by Interc
 ✅ Smart text selection with blue highlighting
 ✅ Real-time text formatting capabilities 
 
-gh repo clone NitishManral/BeyondChatAssignment
 
 ### Install dependencies
 npm install
