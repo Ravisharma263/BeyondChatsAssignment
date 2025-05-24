@@ -2,7 +2,7 @@
 
 A responsive AI Powered Customer Service Chat Panel Interface inspired by Intercom's AI-enhanced dashboard, built with React, Redux, Tailwind and modern UI practices.
 
-[Live Demo] [https://beyond-chat-assignment-r5n4.vercel.app/]
+[Live Demo] []
 
 ## Features
 - **AI Copilot Interface**  
