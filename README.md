@@ -15,6 +15,7 @@ A responsive AI Powered Customer Service Chat Panel Interface inspired by Interc
   Clean 3-column layout with collapsible sidebars
 - **Smart Components**  
   Message composer with auto-height adjustment and keyboard shortcuts
+  **AI Integration**: Contextual AI-powered text enhancement
 
 ## Tech Stack
 - **Frontend**: React + Vite
